@@ -1,0 +1,132 @@
+package nautilus.entity;
+
+import org.jetbrains.annotations.Nullable;
+
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.MovementType;
+import net.minecraft.entity.ai.brain.task.LookTargetUtil;
+import net.minecraft.entity.ai.control.MoveControl;
+import net.minecraft.entity.ai.goal.EscapeDangerGoal;
+import net.minecraft.entity.ai.goal.FleeEntityGoal;
+import net.minecraft.entity.ai.goal.SwimAroundGoal;
+import net.minecraft.entity.ai.pathing.EntityNavigation;
+import net.minecraft.entity.ai.pathing.SwimNavigation;
+import net.minecraft.entity.attribute.DefaultAttributeContainer;
+import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.entity.mob.MobEntity;
+import net.minecraft.entity.mob.WaterCreatureEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.predicate.entity.EntityPredicates;
+import net.minecraft.registry.tag.FluidTags;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
+
+public class NautilusEntity extends WaterCreatureEntity
+{
+	public NautilusEntity(EntityType<NautilusEntity> entityType, World world)
+	{
+		super(entityType, world);
+		this.moveControl = new NautilusMoveControl(this);
+	}
+	
+	@Override
+	protected void initGoals()
+	{
+		this.goalSelector.add(0, new EscapeDangerGoal(this, 2.0));
+        this.goalSelector.add(1, new FleeEntityGoal<PlayerEntity>(this, PlayerEntity.class, 16.0f, 1.6, 1.4, EntityPredicates.EXCEPT_SPECTATOR::test));
+        this.goalSelector.add(2, new SwimToRandomPlaceGoal(this));
+	}
+	
+	public static DefaultAttributeContainer.Builder createNautilusAttributes()
+	{
+		return MobEntity.createMobAttributes().add(EntityAttributes.GENERIC_MAX_HEALTH, 24.0);
+	}
+	
+	public int getArmsTickOffset()
+	{
+        return this.getId() * 3;
+    }
+	
+	@Override
+    protected EntityNavigation createNavigation(World world)
+	{
+        return new SwimNavigation(this, world);
+    }
+
+    @Override
+    public void travel(Vec3d movementInput)
+    {
+        if(this.canMoveVoluntarily() && this.isTouchingWater())
+        {
+            this.updateVelocity(0.01f, movementInput);
+            this.move(MovementType.SELF, this.getVelocity());
+            this.setVelocity(this.getVelocity().multiply(0.9));
+            
+            if(this.getTarget() == null)
+                this.setVelocity(this.getVelocity().add(0.0, -0.0025, 0.0));
+        }
+        else
+            super.travel(movementInput);
+    }
+	
+	static class NautilusMoveControl extends MoveControl
+	{
+        private final NautilusEntity nautilus;
+
+        NautilusMoveControl(NautilusEntity owner)
+        {
+            super(owner);
+            this.nautilus = owner;
+        }
+
+        @Override
+        public void tick()
+        {
+        	boolean reversedMotion = true;
+        	
+            if(this.nautilus.isSubmergedIn(FluidTags.WATER))
+                this.nautilus.setVelocity(this.nautilus.getVelocity().add(0.0, 0.0025, 0.0));
+            
+            if(this.state != MoveControl.State.MOVE_TO || this.nautilus.getNavigation().isIdle())
+            {
+                this.nautilus.setMovementSpeed(0.0f);
+                return;
+            }
+            
+            float f = (float)(this.speed * this.nautilus.getAttributeValue(EntityAttributes.GENERIC_MOVEMENT_SPEED));
+            this.nautilus.setMovementSpeed(MathHelper.lerp(0.125f, this.nautilus.getMovementSpeed(), f));
+            double d = this.targetX - this.nautilus.getX();
+            double e = this.targetY - this.nautilus.getY();
+            double g = this.targetZ - this.nautilus.getZ();
+            
+            if (e != 0.0)
+            {
+                double h = Math.sqrt(d * d + e * e + g * g);
+                this.nautilus.setVelocity(this.nautilus.getVelocity().add(0.0, (double) this.nautilus.getMovementSpeed() * (e / h) * 0.025, 0.0));
+            }
+            
+            if (d != 0.0 || g != 0.0)
+            {
+                float i = (float)(MathHelper.atan2(g, d) * 57.2957763671875) - (reversedMotion ? 270.0f : 90.0f);
+                this.nautilus.setYaw(this.wrapDegrees(this.nautilus.getYaw(), i, reversedMotion ? 270.0f : 90.0f));
+                this.nautilus.bodyYaw = this.nautilus.getYaw();
+            }
+        }
+    }
+
+    static class SwimToRandomPlaceGoal extends SwimAroundGoal
+    {
+        public SwimToRandomPlaceGoal(NautilusEntity nautilus)
+        {
+            super(nautilus, 1.0, 10);
+        }
+        
+        @Override
+        @Nullable
+        protected Vec3d getWanderTarget()
+        {
+            return LookTargetUtil.find(this.mob, 24, 12);
+        }
+    }
+}

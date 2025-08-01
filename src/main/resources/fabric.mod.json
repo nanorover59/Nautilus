@@ -1,0 +1,28 @@
+{
+	"schemaVersion": 1,
+	"id": "nautilus",
+	"version": "1.2.0",
+	"name": "Nautilus",
+	"description": "Simply adds a nautilus mob to complement the vanilla shell item.",
+	"authors": [
+		"nanorover59"
+	],
+	"license": "MIT License",
+	"icon": "assets/nautilus/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"nautilus.NautilusMod"
+		],
+		"client": [
+			"nautilus.NautilusModClient"
+		]
+	},
+	"mixins": [],
+	"depends": {
+		"fabricloader": ">=0.15.11",
+		"minecraft": "~1.21",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
